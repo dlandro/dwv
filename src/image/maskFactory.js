@@ -1,9 +1,13 @@
 import {
+  dateToDateObj,
+  getDicomDate,
+  dateToTimeObj,
+  getDicomTime,
+} from '../dicom/dicomDate';
+import {
   getImage2DSize,
   getSpacingFromMeasure,
   getDimensionOrganization,
-  getDicomDate,
-  getDicomTime,
   getDicomMeasureItem,
   getDicomPlaneOrientationItem
 } from '../dicom/dicomElementsWrapper';
@@ -203,7 +207,7 @@ function createRoiSliceBuffers(
  *
  * @param {Image} image The mask image.
  * @param {MaskSegment[]} segments The mask segments.
- * @returns {object} The ROI buffers
+ * @returns {object} The ROI buffers.
  */
 function createRoiBuffers(image, segments) {
   const geometry = image.getGeometry();
@@ -512,8 +516,14 @@ export class MaskFactory {
     if (typeof spacing === 'undefined') {
       throw new Error('No spacing found for DICOM SEG');
     }
+    if (spacing.length() !== 3) {
+      throw new Error('Incomplete spacing found for DICOM SEG');
+    }
     if (typeof imageOrientationPatient === 'undefined') {
       throw new Error('No imageOrientationPatient found for DICOM SEG');
+    }
+    if (imageOrientationPatient.length !== 6) {
+      throw new Error('Incomplete imageOrientationPatient found for DICOM SEG');
     }
 
     // orientation
@@ -526,12 +536,13 @@ export class MaskFactory {
       parseFloat(imageOrientationPatient[4]),
       parseFloat(imageOrientationPatient[5]));
     const normal = rowCosines.crossProduct(colCosines);
-    /* eslint-disable array-element-newline */
+    /* eslint-disable @stylistic/js/array-element-newline */
     const orientationMatrix = new Matrix33([
       rowCosines.getX(), colCosines.getX(), normal.getX(),
       rowCosines.getY(), colCosines.getY(), normal.getY(),
       rowCosines.getZ(), colCosines.getZ(), normal.getZ()
     ]);
+    /* eslint-enable @stylistic/js/array-element-newline */
 
     // sort positions patient
     framePosPats.sort(getComparePosPat(orientationMatrix));
@@ -752,8 +763,8 @@ export class MaskFactory {
     tags.Columns = size.get(0);
     // update content tags
     const now = new Date();
-    tags.ContentDate = getDicomDate(now);
-    tags.ContentTime = getDicomTime(now);
+    tags.ContentDate = getDicomDate(dateToDateObj(now));
+    tags.ContentTime = getDicomTime(dateToTimeObj(now));
 
     // keep source image StudyInstanceUID
     if (sourceImage !== undefined) {

@@ -1,6 +1,73 @@
 import {stringToUint8Array} from './string';
 
 /**
+ * Get a string id from array values in the form of: '#0-1_#1-2'.
+ *
+ * @param {Array} arr The input array.
+ * @param {number[]} [dims] Optional list of dimensions to use.
+ * @returns {string} The string id.
+ */
+export function toStringId(arr, dims) {
+  // use all dims if not as input
+  if (typeof dims === 'undefined') {
+    dims = [];
+    for (let i = 0; i < arr.length; ++i) {
+      dims.push(i);
+    }
+  }
+  // check dims
+  for (let i = 0; i < dims.length; ++i) {
+    if (dims[i] >= arr.length) {
+      throw new Error('Non valid dimension for toStringId');
+    }
+  }
+  // build string
+  let res = '';
+  for (let i = 0; i < dims.length; ++i) {
+    if (i !== 0) {
+      res += '_';
+    }
+    res += '#' + dims[i] + '-' + arr[dims[i]];
+  }
+  return res;
+}
+
+/**
+ * Get an array from an id string in the form of: '#0-1_#1-2'
+ * (result of toStringId).
+ *
+ * @param {string} inputStr The input string.
+ * @returns {Array} The corresponding array (minimum size is 3D).
+ */
+export function getArrayFromStringId(inputStr) {
+  // split ids
+  const strIds = inputStr.split('_');
+  // get the size of the index (minimum 3)
+  let numberOfDims = 3;
+  let dim;
+  for (let i = 0; i < strIds.length; ++i) {
+    // expecting dim < 10
+    dim = parseInt(strIds[i].substring(1, 2), 10);
+    // dim is zero based
+    if (dim + 1 > numberOfDims) {
+      numberOfDims = dim + 1;
+    }
+  }
+  // default values
+  const values = new Array(numberOfDims);
+  values.fill(0);
+  // get other values from the input string
+  for (let j = 0; j < strIds.length; ++j) {
+    // expecting dim < 10
+    dim = parseInt(strIds[j].substring(1, 2), 10);
+    const value = parseInt(strIds[j].substring(3), 10);
+    values[dim] = value;
+  }
+
+  return values;
+}
+
+/**
  * Check if the first input array contains all the
  * elements of the second input array.
  *
@@ -83,7 +150,7 @@ export function uint8ArrayToString(arr) {
 
 /**
  * Array find in a subset of the input array.
- * Equivalent to: arr.slice(start, end).find(callbackFn)
+ * Equivalent to: `arr.slice(start, end).find(callbackFn)`.
  *
  * @param {Uint8Array} arr The input array to search.
  * @param {Function} callbackFn The find function.
@@ -132,11 +199,12 @@ export function getFindArrayInArrayCallback(arr1) {
 
 /**
  * Extract each element of a multipart ArrayBuffer.
- * https://en.wikipedia.org/wiki/MIME#Multipart_messages
+ *
+ * Ref: {@link https://en.wikipedia.org/wiki/MIME#Multipart_messages}.
  *
  * @param {ArrayBuffer} arr The multipart array.
  * @returns {Array} The multipart parts as an array of object as
- *  {'Content-Type', ..., data} (depending on header tags)
+ *   {'Content-Type', ..., data} (depending on header tags).
  */
 export function parseMultipart(arr) {
   const u8Array = new Uint8Array(arr);
@@ -236,8 +304,10 @@ export function parseMultipart(arr) {
 
 /**
  * Build a multipart message.
- * See: https://en.wikipedia.org/wiki/MIME#Multipart_messages
- * See: https://hg.orthanc-server.com/orthanc-dicomweb/file/tip/Resources/Samples/JavaScript/stow-rs.js
+ *
+ * Ref:
+ * - {@link https://en.wikipedia.org/wiki/MIME#Multipart_messages},
+ * - {@link https://hg.orthanc-server.com/orthanc-dicomweb/file/tip/Resources/Samples/JavaScript/stow-rs.js}.
  *
  * @param {Array} parts The message parts as an array of object containing
  *   content headers and messages as the data property (as returned by parse).

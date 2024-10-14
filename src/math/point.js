@@ -48,6 +48,15 @@ export class Point2D {
   }
 
   /**
+   * Get the centroid of the point, ie itself.
+   *
+   * @returns {Point2D} The centroid point.
+   */
+  getCentroid() {
+    return this;
+  }
+
+  /**
    * Check for Point2D equality.
    *
    * @param {Point2D} rhs The other point to compare to.
@@ -67,6 +76,18 @@ export class Point2D {
    */
   toString() {
     return '(' + this.#x + ', ' + this.#y + ')';
+  }
+
+  /**
+   * Get the distance to another Point2D.
+   *
+   * @param {Point2D} point2D The input point.
+   * @returns {number} Ths distance to the input point.
+   */
+  getDistance(point2D) {
+    const dx = this.#x - point2D.getX();
+    const dy = this.#y - point2D.getY();
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
 } // Point2D class

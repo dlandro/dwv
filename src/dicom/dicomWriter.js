@@ -13,6 +13,7 @@ import {
   getFileMetaInformationGroupLengthTag,
   isPixelDataTag,
   isItemTag,
+  isItemDelimitationItemTag,
   tagCompareFunction
 } from './dicomTag';
 import {
@@ -106,11 +107,14 @@ export function getDefaultAnonymisationRules() {
 
 /**
  * Get a UID for a DICOM tag.
- * Note: Use https://github.com/uuidjs/uuid?
  *
- * @see http://dicom.nema.org/dicom/2013/output/chtml/part05/chapter_9.html
- * @see http://dicomiseasy.blogspot.com/2011/12/chapter-4-dicom-objects-in-chapter-3.html
- * @see https://stackoverflow.com/questions/46304306/how-to-generate-unique-dicom-uid
+ * Note: Use {@link https://github.com/uuidjs/uuid}?
+ *
+ * Ref:
+ * - {@link http://dicom.nema.org/medical/dicom/2022a/output/chtml/part05/chapter_9.html},
+ * - {@link http://dicomiseasy.blogspot.com/2011/12/chapter-4-dicom-objects-in-chapter-3.html},
+ * - {@link https://stackoverflow.com/questions/46304306/how-to-generate-unique-dicom-uid}.
+ *
  * @param {string} tagName The input tag.
  * @returns {string} The corresponding UID.
  */
@@ -184,7 +188,8 @@ function isStringVr(vr) {
 
 /**
  * Is the input VR a VR that could need padding.
- * see http://dicom.nema.org/dicom/2013/output/chtml/part05/sect_6.2.html
+ *
+ * See {@link http://dicom.nema.org/medical/dicom/2022a/output/chtml/part05/sect_6.2.html}.
  *
  * @param {string} vr The element VR.
  * @returns {boolean} True if the VR needs padding.
@@ -261,10 +266,10 @@ function padOBValue(value) {
 }
 
 /**
- * Helper method to flatten an array of typed arrays to 2D typed array
+ * Helper method to flatten an array of typed arrays to 2D typed array.
  *
- * @param {Array} initialArray array of typed arrays
- * @returns {object} a typed array containing all values
+ * @param {Array} initialArray Array of typed arrays.
+ * @returns {object} A typed array containing all values.
  */
 function flattenArrayOfTypedArrays(initialArray) {
   const initialArrayLength = initialArray.length;
@@ -348,7 +353,7 @@ export class DicomWriter {
 
   /**
    * Flag to use VR=UN for private sequences, default to false
-   * (mainly used in tests)
+   * (mainly used in tests).
    *
    * @type {boolean}
    */
@@ -363,7 +368,7 @@ export class DicomWriter {
   #fixUnknownVR = true;
 
   /**
-   * Default rules: just copy
+   * Default rules: just copy.
    *
    * @type {Object<string, WriterRule>}
    */
@@ -426,7 +431,7 @@ export class DicomWriter {
    * if nothing is found the default rule is applied.
    *
    * @param {Object<string, WriterRule>} rules The input rules.
-   * @param {boolean} [addMissingTags] if true, explicit tags that
+   * @param {boolean} [addMissingTags] If true, explicit tags that
    *   have replace rule and a value will be
    *   added if missing. Defaults to false.
    */
@@ -497,8 +502,9 @@ export class DicomWriter {
     /**
      * The text encoder.
      *
+     * Ref: {@link https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder}.
+     *
      * @external TextEncoder
-     * @see https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder
      */
     this.#textEncoder = new TextEncoder();
   }
@@ -507,7 +513,7 @@ export class DicomWriter {
    * Get the element to write according to the class rules.
    * Priority order: tagName, groupName, default.
    *
-   * @param {DataElement} element The element to check
+   * @param {DataElement} element The element to check.
    * @returns {DataElement|null} The element to write, can be null.
    */
   getElementToWrite(element) {
@@ -546,29 +552,31 @@ export class DicomWriter {
    */
   #writeDataElementItems(
     writer, byteOffset, items, isImplicit) {
-    let item = null;
+    let item;
     for (let i = 0; i < items.length; ++i) {
       item = items[i];
-      const itemKeys = Object.keys(item);
-      if (itemKeys.length === 0) {
+      if (item.length === 0) {
         continue;
       }
       // item element (create new to not modify original)
       let undefinedLength = false;
-      if (typeof item['FFFEE000'].undefinedLength !== 'undefined') {
-        undefinedLength = item['FFFEE000'].undefinedLength;
+      const itemTag = item.find((subItem) => isItemTag(subItem.tag));
+      if (typeof itemTag !== 'undefined' &&
+        typeof itemTag.undefinedLength !== 'undefined') {
+        undefinedLength = itemTag.undefinedLength;
       }
       const itemElement = new DataElement('NONE');
-      itemElement.vl = undefinedLength ? 0xffffffff : item['FFFEE000'].vl,
+      itemElement.vl = undefinedLength ? 0xffffffff : itemTag.vl,
       itemElement.tag = getItemTag();
       itemElement.value = [];
       byteOffset = this.#writeDataElement(
         writer, itemElement, byteOffset, isImplicit);
       // write rest
-      for (let m = 0; m < itemKeys.length; ++m) {
-        if (itemKeys[m] !== 'FFFEE000' && itemKeys[m] !== 'FFFEE00D') {
+      for (const subItem of item) {
+        if (!isItemTag(subItem.tag) &&
+          !isItemDelimitationItemTag(subItem.tag)) {
           byteOffset = this.#writeDataElement(
-            writer, item[itemKeys[m]], byteOffset, isImplicit);
+            writer, subItem, byteOffset, isImplicit);
         }
       }
       // item delimitation
@@ -975,15 +983,17 @@ export class DicomWriter {
     // ImplementationClassUID
     const icUID = getDataElement('ImplementationClassUID');
     let icUIDSize = getDataElementPrefixByteSize(icUID.vr, false);
-    icUIDSize += this.#setElementValue(
-      icUID, [getUID('ImplementationClassUID')], false);
+    const icUIDValue =
+      getUID('ImplementationClassUID').replace('-beta', '.99');
+    icUIDSize += this.#setElementValue(icUID, [icUIDValue], false);
     metaElements.push(icUID);
     metaLength += icUIDSize;
     totalSize += icUIDSize;
     // ImplementationVersionName
     const ivn = getDataElement('ImplementationVersionName');
     let ivnSize = getDataElementPrefixByteSize(ivn.vr, false);
-    const ivnValue = 'DWV_' + getDwvVersion();
+    const dwvVersion = getDwvVersion().replace('-beta', '.99');
+    const ivnValue = 'DWV_' + dwvVersion;
     ivnSize += this.#setElementValue(ivn, [ivnValue], false);
     metaElements.push(ivn);
     metaLength += ivnSize;
@@ -1062,7 +1072,6 @@ export class DicomWriter {
 
       if (value !== null && value !== 0) {
         const newItems = [];
-        let name;
 
         // explicit or undefined length sequence
         let undefinedLength = false;
@@ -1074,7 +1083,7 @@ export class DicomWriter {
         // items
         for (let i = 0; i < value.length; ++i) {
           const oldItemElements = value[i];
-          const newItemElements = {};
+          const newItemElements = [];
           let subSize = 0;
 
           // check data
@@ -1103,7 +1112,7 @@ export class DicomWriter {
             // set item value
             subSize += this.#setElementValue(
               subElement, subElement.value, isImplicit, sqBitsAllocated);
-            newItemElements[itemKey] = subElement;
+            newItemElements.push(subElement);
             // add prefix size
             subSize += getDataElementPrefixByteSize(
               subElement.vr, isImplicit);
@@ -1119,8 +1128,7 @@ export class DicomWriter {
           if (undefinedLength) {
             itemElement.undefinedLength = undefinedLength;
           }
-          name = itemElement.tag.getKey();
-          newItemElements[name] = itemElement;
+          newItemElements.push(itemElement);
           subSize += getDataElementPrefixByteSize(
             itemElement.vr, isImplicit);
 
@@ -1129,6 +1137,12 @@ export class DicomWriter {
             subSize += getDataElementPrefixByteSize(
               'NONE', isImplicit);
           }
+
+          // sort
+          const elemSortFunc = function (a, b) {
+            return tagCompareFunction(a.tag, b.tag);
+          };
+          newItemElements.sort(elemSortFunc);
 
           size += subSize;
           newItems.push(newItemElements);
@@ -1236,7 +1250,7 @@ export class DicomWriter {
 
 /**
  * Fix for broken DICOM elements: replace "UN" with correct VR if the
- * element exists in dictionary
+ * element exists in dictionary.
  *
  * @param {DataElement} element The DICOM element.
  * @param {boolean} [isLittleEndian] Flag to tell if the data is little

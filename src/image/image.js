@@ -179,8 +179,8 @@ export class Image {
   #photometricInterpretation = 'MONOCHROME2';
 
   /**
-   * Planar configuration for RGB data (0:RGBRGBRGBRGB... or
-   *   1:RRR...GGG...BBB...).
+   * Planar configuration for RGB data (`0:RGBRGBRGBRGB...` or
+   *   `1:RRR...GGG...BBB...`).
    *
    * @type {number}
    */
@@ -257,6 +257,32 @@ export class Image {
   }
 
   /**
+   * Get the image origin for a image UID.
+   *
+   * @param {string} uid The UID.
+   * @returns {Point3D|undefined} The origin.
+   */
+  getOriginForImageUid(uid) {
+    let origin;
+    const uidIndex = this.#imageUids.indexOf(uid);
+    if (uidIndex !== -1) {
+      const origins = this.getGeometry().getOrigins();
+      origin = origins[uidIndex];
+    }
+    return origin;
+  }
+
+  /**
+   * Check if the image includes an UID.
+   *
+   * @param {string} uid The UID.
+   * @returns {boolean} True if present.
+   */
+  includesImageUid(uid) {
+    return this.#imageUids.includes(uid);
+  }
+
+  /**
    * Check if this image includes the input uids.
    *
    * @param {string[]} uids UIDs to test for presence.
@@ -278,7 +304,7 @@ export class Image {
   /**
    * Get the data buffer of the image.
    *
-   * @todo dangerous...
+   * @todo Dangerous...
    * @returns {TypedArray} The data buffer of the image.
    */
   getBuffer() {

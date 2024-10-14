@@ -12,13 +12,13 @@ import dwvTestBadZip from '../data/dwv-test_bad.zip';
 /**
  * Tests for the 'io/memoryLoader.js' file.
  */
-/** @module tests/io */
+
 // Do not warn if these variables were not defined before.
 /* global QUnit */
 QUnit.module('io');
 
 /**
- * Check the events of memory load
+ * Check the events of memory load.
  *
  * @param {object} assert The Qunit assert object.
  * @param {string} id An id for the test.
@@ -149,7 +149,7 @@ function checkLoad(assert, id, data, nData, nDataOk) {
  * @function module:tests/io~memoryLoader-events-single-frame
  */
 QUnit.test(
-  // eslint-disable-next-line max-len
+  // eslint-disable-next-line @stylistic/js/max-len
   'MemoryLoader events single frame - #DWV-REQ-IO-04-001 DICOM load start event',
   function (assert) {
     // #0: 2 good dicom
@@ -208,7 +208,6 @@ QUnit.test(
  * @function module:tests/io~memoryLoader-events-multi-frame
  */
 QUnit.test(
-  // eslint-disable-next-line max-len
   'MemoryLoader events multi frame - #DWV-REQ-IO-04-001 DICOM load start event',
   function (assert) {
     // #0: simple multi frame
@@ -239,7 +238,6 @@ QUnit.test(
  * @function module:tests/io~memoryLoader-event-zip
  */
 QUnit.test(
-  // eslint-disable-next-line max-len
   'MemoryLoader events zip - #DWV-REQ-IO-04-001 DICOM load start event',
   function (assert) {
     // #0: simple zip

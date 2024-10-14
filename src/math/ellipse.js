@@ -1,4 +1,3 @@
-import {i18n} from '../utils/i18n';
 import {getStats} from './stats';
 import {Index} from './index';
 
@@ -74,6 +73,15 @@ export class Ellipse {
   }
 
   /**
+   * Get the centroid of the ellipse.
+   *
+   * @returns {Point2D} The centroid point.
+   */
+  getCentroid() {
+    return this.#centre;
+  }
+
+  /**
    * Get the radius of the ellipse on the horizontal axe.
    *
    * @returns {number} The radius of the ellipse on the horizontal axe.
@@ -126,9 +134,12 @@ export class Ellipse {
 
   /**
    * Get the rounded limits of the ellipse.
-   * (see https://en.wikipedia.org/wiki/Ellipse#Standard_equation)
-   * Ellipse formula: x*x / a*a + y*y / b*b = 1
-   * => y = (+-)(b/a) * sqrt(a*a - x*x)
+   *
+   * See: {@link https://en.wikipedia.org/wiki/Ellipse#Standard_equation}.
+   *
+   * Ellipse formula: `x*x / a*a + y*y / b*b = 1`.
+   *
+   * Implies: `y = (+-)(b/a) * sqrt(a*a - x*x)`.
    *
    * @returns {number[][][]} The rounded limits:
    *  list of [x, y] pairs (min, max).
@@ -177,15 +188,18 @@ export class Ellipse {
     const spacing2D = viewController.get2DSpacing();
     quant.a = {
       value: this.getA() * spacing2D.x,
-      unit: i18n.t('unit.mm')
+      unit: 'unit.mm'
     };
     quant.b = {
       value: this.getB() * spacing2D.y,
-      unit: i18n.t('unit.mm')
+      unit: 'unit.mm'
     };
     const surface = this.getWorldSurface(spacing2D);
     if (surface !== null) {
-      quant.surface = {value: surface / 100, unit: i18n.t('unit.cm2')};
+      quant.surface = {
+        value: surface / 100,
+        unit: 'unit.cm2'
+      };
     }
 
     // pixel values quantification

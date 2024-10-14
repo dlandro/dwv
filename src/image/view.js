@@ -9,6 +9,7 @@ import {generateImageDataPaletteColor} from './viewPaletteColor';
 import {generateImageDataRgb} from './viewRgb';
 import {generateImageDataYbrFull} from './viewYbrFull';
 import {ViewFactory} from './viewFactory';
+import {isIdentityMat33} from '../math/matrix';
 import {getSliceIterator} from '../image/iterator';
 import {ListenerHandler} from '../utils/listen';
 import {logger} from '../utils/logger';
@@ -524,6 +525,35 @@ export class View {
   }
 
   /**
+   * Get the SOP image UID of the current image.
+   *
+   * @returns {string} The UID.
+   */
+  getCurrentImageUid() {
+    return this.#image.getImageUid(this.getCurrentIndex());
+  }
+
+  /**
+   * Get the image origin for a image UID.
+   *
+   * @param {string} uid The UID.
+   * @returns {Point3D|undefined} The origin.
+   */
+  getOriginForImageUid(uid) {
+    return this.#image.getOriginForImageUid(uid);
+  }
+
+  /**
+   * Check if the image includes an UID.
+   *
+   * @param {string} uid The UID.
+   * @returns {boolean} True if present.
+   */
+  includesImageUid(uid) {
+    return this.#image.includesImageUid(uid);
+  }
+
+  /**
    * Check if the current position (default) or
    * the provided position is in bounds.
    *
@@ -565,7 +595,7 @@ export class View {
    *
    * @param {Point} position The new position.
    * @param {boolean} silent Flag to fire event or not.
-   * @returns {boolean} False if not in bounds
+   * @returns {boolean} False if not in bounds.
    * @fires View#positionchange
    */
   setCurrentPosition(position, silent) {
@@ -960,6 +990,15 @@ export class View {
       index = 2;
     }
     return index;
+  }
+
+  /**
+   * Is this view in the same orientation as the image aquisition.
+   *
+   * @returns {boolean} True if in aquisition plane.
+   */
+  isAquisitionOrientation() {
+    return isIdentityMat33(this.#orientation);
   }
 
 } // class View

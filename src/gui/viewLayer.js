@@ -170,7 +170,8 @@ export class ViewLayer {
 
   /**
    * Image smoothing flag.
-   * see: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled
+   *
+   * See: {@link https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled}.
    *
    * @type {boolean}
    */
@@ -219,12 +220,15 @@ export class ViewLayer {
   }
 
   /**
-   * Get the layer zoom offset.
+   * Get the layer zoom offset without the fit scale.
    *
    * @returns {Scalar2D} The offset as {x,y}.
    */
-  getZoomOffset() {
-    return this.#zoomOffset;
+  getAbsoluteZoomOffset() {
+    return {
+      x: this.#zoomOffset.x * this.#fitScale.x,
+      y: this.#zoomOffset.y * this.#fitScale.y
+    };
   }
 
   /**
@@ -254,7 +258,7 @@ export class ViewLayer {
       view.addEventListener(viewEventNames[j], this.#fireEvent);
     }
     // create view controller
-    this.#viewController = new ViewController(view, dataId);
+    this.#viewController = new ViewController(view);
     // bind layer and image
     this.bindImage();
   }
@@ -286,7 +290,7 @@ export class ViewLayer {
   onimageset = (event) => {
     // event.value = [index, image]
     if (this.#dataId === event.dataid) {
-      this.#viewController.setImage(event.value[0], this.#dataId);
+      this.#viewController.setImage(event.value[0]);
       this.#setBaseSize(this.#viewController.getImageSize().get2D());
       this.#needsDataUpdate = true;
     }
@@ -529,13 +533,13 @@ export class ViewLayer {
   }
 
   /**
-   * Initialise the layer scale. Works with a zoom offset that
-   * comes from a equal view layer (size, scale, offset...).
+   * Initialise the layer scale.
    *
    * @param {Scalar3D} newScale The scale as {x,y,z}.
-   * @param {Scalar2D} zoomOffset The zoom offset as {x,y}.
+   * @param {Scalar2D} absoluteZoomOffset The zoom offset as {x,y}
+   *   without the fit scale (as provided by getAbsoluteZoomOffset).
    */
-  initScale(newScale, zoomOffset) {
+  initScale(newScale, absoluteZoomOffset) {
     const helper = this.#viewController.getPlaneHelper();
     const orientedNewScale = helper.getTargetOrientedPositiveXYZ({
       x: newScale.x * this.#flipScale.x,
@@ -548,10 +552,13 @@ export class ViewLayer {
     };
     this.#scale = finalNewScale;
 
-    this.#zoomOffset = zoomOffset;
+    this.#zoomOffset = {
+      x: absoluteZoomOffset.x / this.#fitScale.x,
+      y: absoluteZoomOffset.y / this.#fitScale.y
+    };
     this.#offset = {
-      x: this.#offset.x + zoomOffset.x,
-      y: this.#offset.y + zoomOffset.y
+      x: this.#offset.x + this.#zoomOffset.x,
+      y: this.#offset.y + this.#zoomOffset.y
     };
   }
 
@@ -712,7 +719,7 @@ export class ViewLayer {
 
   /**
    * Draw the content (imageData) of the layer.
-   * The imageData variable needs to be set
+   * The imageData variable needs to be set.
    *
    * @fires App#renderstart
    * @fires App#renderend
@@ -784,7 +791,7 @@ export class ViewLayer {
   }
 
   /**
-   * Initialise the layer: set the canvas and context
+   * Initialise the layer: set the canvas and context.
    *
    * @param {Scalar2D} size The image size as {x,y}.
    * @param {Scalar2D} spacing The image spacing as {x,y}.
@@ -849,43 +856,44 @@ export class ViewLayer {
   /**
    * Fit the layer to its parent container.
    *
-   * @param {number} fitScale1D The 1D fit scale.
-   * @param {Scalar2D} fitSize The fit size as {x,y}.
+   * @param {Scalar2D} containerSize The fit size as {x,y}.
+   * @param {number} divToWorldSizeRatio The div to world size ratio.
    * @param {Scalar2D} fitOffset The fit offset as {x,y}.
    */
-  fitToContainer(fitScale1D, fitSize, fitOffset) {
+  fitToContainer(containerSize, divToWorldSizeRatio, fitOffset) {
     let needsDraw = false;
 
     // set canvas size if different from previous
-    if (this.#canvas.width !== fitSize.x ||
-      this.#canvas.height !== fitSize.y) {
-      if (!canCreateCanvas(fitSize.x, fitSize.y)) {
-        throw new Error('Cannot resize canvas ' + fitSize.x + ', ' + fitSize.y);
+    if (this.#canvas.width !== containerSize.x ||
+      this.#canvas.height !== containerSize.y) {
+      if (!canCreateCanvas(containerSize.x, containerSize.y)) {
+        throw new Error('Cannot resize canvas ' +
+          containerSize.x + ', ' + containerSize.y);
       }
       // canvas size change triggers canvas reset
-      this.#canvas.width = fitSize.x;
-      this.#canvas.height = fitSize.y;
+      this.#canvas.width = containerSize.x;
+      this.#canvas.height = containerSize.y;
       // update draw flag
       needsDraw = true;
     }
 
     // fit scale
-    const newFitScale = {
-      x: fitScale1D * this.#baseSpacing.x,
-      y: fitScale1D * this.#baseSpacing.y
+    const divToImageSizeRatio = {
+      x: divToWorldSizeRatio * this.#baseSpacing.x,
+      y: divToWorldSizeRatio * this.#baseSpacing.y
     };
     // #scale = inputScale * fitScale * flipScale
     // flipScale does not change here, we can omit it
     // newScale = (#scale / fitScale) * newFitScale
     const newScale = {
-      x: this.#scale.x * newFitScale.x / this.#fitScale.x,
-      y: this.#scale.y * newFitScale.y / this.#fitScale.y
+      x: this.#scale.x * divToImageSizeRatio.x / this.#fitScale.x,
+      y: this.#scale.y * divToImageSizeRatio.y / this.#fitScale.y
     };
 
     // set scales if different from previous
     if (this.#scale.x !== newScale.x ||
       this.#scale.y !== newScale.y) {
-      this.#fitScale = newFitScale;
+      this.#fitScale = divToImageSizeRatio;
       this.#scale = newScale;
       // update draw flag
       needsDraw = true;
@@ -893,13 +901,17 @@ export class ViewLayer {
 
     // view offset
     const newViewOffset = {
-      x: fitOffset.x / newFitScale.x,
-      y: fitOffset.y / newFitScale.y
+      x: fitOffset.x / divToImageSizeRatio.x,
+      y: fitOffset.y / divToImageSizeRatio.y
     };
-    // #flipOffset = canvas / #scale
+    // flip offset
+    const scaledImageSize = {
+      x: containerSize.x / divToImageSizeRatio.x,
+      y: containerSize.y / divToImageSizeRatio.y
+    };
     const newFlipOffset = {
-      x: this.#flipOffset.x !== 0 ? fitSize.x / newFitScale.x : 0,
-      y: this.#flipOffset.y !== 0 ? fitSize.y / newFitScale.y : 0,
+      x: this.#flipOffset.x !== 0 ? scaledImageSize.x : 0,
+      y: this.#flipOffset.y !== 0 ? scaledImageSize.y : 0,
     };
 
     // set offsets if different from previous

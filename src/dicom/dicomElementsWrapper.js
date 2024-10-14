@@ -3,6 +3,11 @@ import {
   getTransferSyntaxName
 } from './dicomParser';
 import {
+  getDate,
+  getTime,
+  getDateTime
+} from './dicomDate';
+import {
   isPixelDataTag,
   isItemDelimitationItemTag,
   isSequenceDelimitationItemTag,
@@ -454,146 +459,6 @@ export function getPixelUnit(elements) {
 }
 
 /**
- * Get a 'date' object with {year, monthIndex, day} ready for the
- *   Date constructor from a DICOM element with vr=DA.
- *
- * @param {object} element The DICOM element with date information.
- * @returns {{year, monthIndex, day}|undefined} The 'date' object.
- */
-export function getDate(element) {
-  if (typeof element === 'undefined') {
-    return undefined;
-  }
-  if (element.value.length !== 1) {
-    return undefined;
-  }
-  const daValue = element.value[0];
-  // Two possible formats:
-  // - standard 'YYYYMMDD'
-  // - non-standard 'YYYY.MM.DD' (previous ACR-NEMA)
-  let monthBeginIndex = 4;
-  let dayBeginIndex = 6;
-  if (daValue.length === 10) {
-    monthBeginIndex = 5;
-    dayBeginIndex = 8;
-  }
-  const daYears = parseInt(daValue.substring(0, 4), 10);
-  // 0-11 range
-  const daMonthIndex = daValue.length >= monthBeginIndex + 2
-    ? parseInt(daValue.substring(
-      monthBeginIndex, monthBeginIndex + 2), 10) - 1 : 0;
-  const daDay = daValue.length === dayBeginIndex + 2
-    ? parseInt(daValue.substring(
-      dayBeginIndex, dayBeginIndex + 2), 10) : 0;
-  return {
-    year: daYears,
-    monthIndex: daMonthIndex,
-    day: daDay
-  };
-}
-
-/**
- * Get a time object with {hours, minutes, seconds} ready for the
- *   Date constructor from a DICOM element with vr=TM.
- *
- * @param {object} element The DICOM element with date information.
- * @returns {{hours, minutes, seconds, milliseconds}|undefined} The time object.
- */
-export function getTime(element) {
-  if (typeof element === 'undefined') {
-    return undefined;
-  }
-  if (element.value.length !== 1) {
-    return undefined;
-  }
-  // format: HH[MMSS.FFFFFF]
-  const tmValue = element.value[0];
-  const tmHours = parseInt(tmValue.substring(0, 2), 10);
-  const tmMinutes = tmValue.length >= 4
-    ? parseInt(tmValue.substring(2, 4), 10) : 0;
-  const tmSeconds = tmValue.length >= 6
-    ? parseInt(tmValue.substring(4, 6), 10) : 0;
-  const tmFracSecondsStr = tmValue.length >= 8
-    ? tmValue.substring(7, 10) : 0;
-  const tmMilliSeconds = tmFracSecondsStr === 0 ? 0
-    : parseInt(tmFracSecondsStr, 10) *
-      Math.pow(10, 3 - tmFracSecondsStr.length);
-  return {
-    hours: tmHours,
-    minutes: tmMinutes,
-    seconds: tmSeconds,
-    milliseconds: tmMilliSeconds
-  };
-}
-
-/**
- * Get a 'dateTime' object with {date, time} ready for the
- *   Date constructor from a DICOM element with vr=DT.
- *
- * @param {object} element The DICOM element with date-time information.
- * @returns {{date, time}|undefined} The time object.
- */
-export function getDateTime(element) {
-  if (typeof element === 'undefined') {
-    return undefined;
-  }
-  if (element.value.length !== 1) {
-    return undefined;
-  }
-  // format: YYYYMMDDHHMMSS.FFFFFF&ZZXX
-  const dtFullValue = element.value[0];
-  // remove offset (&ZZXX)
-  const dtValue = dtFullValue.split('&')[0];
-  const dtDate = getDate({value: [dtValue.substring(0, 8)]});
-  const dtTime = dtValue.length >= 9
-    ? getTime({value: [dtValue.substring(8)]}) : undefined;
-  return {
-    date: dtDate,
-    time: dtTime
-  };
-}
-
-/**
- * Pad an input string with a '0' to form a 2 digit one.
- *
- * @param {string} str The string to pad.
- * @returns {string} The padded string.
- */
-function padZeroTwoDigit(str) {
-  return ('0' + str).slice(-2);
-}
-
-/**
- * Get a DICOM formated date.
- *
- * @param {Date} date The date to format.
- * @returns {string} The formated date.
- */
-export function getDicomDate(date) {
-  // YYYYMMDD
-  return (
-    date.getFullYear().toString() +
-    padZeroTwoDigit((date.getMonth() + 1).toString()) +
-    padZeroTwoDigit(date.getDate().toString())
-  );
-}
-
-/**
- * Get a DICOM formated time.
- *
- * @param {Date} date The date to format.
- * @returns {string} The formated time.
- */
-export function getDicomTime(date) {
-  // HHMMSS
-  return (
-    padZeroTwoDigit(date.getHours().toString()) +
-    padZeroTwoDigit(date.getMinutes().toString()) +
-    padZeroTwoDigit(date.getSeconds().toString())
-  );
-}
-
-/**
  * Check the dimension organization from a dicom element.
  *
  * @param {DataElements} dataElements The root dicom element.
@@ -676,11 +541,8 @@ export function getSpacingFromMeasure(dataElements) {
     parseFloat(pixelSpacing.value[1]),
     parseFloat(pixelSpacing.value[0]),
   ];
-  // Slice Thickness
-  if (typeof dataElements['00180050'] !== 'undefined') {
-    spacingValues.push(parseFloat(dataElements['00180050'].value[0]));
-  } else if (typeof dataElements['00180088'] !== 'undefined') {
-    // Spacing Between Slices
+  // Spacing Between Slices
+  if (typeof dataElements['00180088'] !== 'undefined') {
     spacingValues.push(parseFloat(dataElements['00180088'].value[0]));
   }
   return new Spacing(spacingValues);
@@ -696,7 +558,7 @@ export function getOrientationMatrix(dataElements) {
   const imageOrientationPatient = dataElements['00200037'];
   let orientationMatrix;
   // slice orientation (cosines are matrices' columns)
-  // http://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_C.7.6.2.html#sect_C.7.6.2.1.1
+  // http://dicom.nema.org/medical/dicom/2022a/output/chtml/part03/sect_C.7.6.2.html#sect_C.7.6.2.1.1
   if (typeof imageOrientationPatient !== 'undefined') {
     orientationMatrix =
       getOrientationFromCosines(
@@ -946,9 +808,11 @@ function getDecayedDose(elements) {
 /**
  * Get the PET SUV factor.
  *
- * @see https://qibawiki.rsna.org/images/6/62/SUV_vendorneutral_pseudocode_happypathonly_20180626_DAC.pdf
- * @see https://qibawiki.rsna.org/images/8/86/SUV_vendorneutral_pseudocode_20180626_DAC.pdf
- * (from https://qibawiki.rsna.org/index.php/Standardized_Uptake_Value_(SUV)#SUV_Calculation )
+ * Ref:
+ * - {@link https://qibawiki.rsna.org/index.php/Standardized_Uptake_Value_(SUV)#SUV_Calculation},
+ * - {@link https://qibawiki.rsna.org/images/6/62/SUV_vendorneutral_pseudocode_happypathonly_20180626_DAC.pdf},
+ * - {@link https://qibawiki.rsna.org/images/8/86/SUV_vendorneutral_pseudocode_20180626_DAC.pdf}.
+ *
  * @param {object} elements The DICOM elements.
  * @returns {object} The value and a warning if
  *   the elements are not as expected.
@@ -996,9 +860,9 @@ export function getSuvFactor(elements) {
 }
 
 /**
- * Get the file list from a DICOMDIR
+ * Get the file list from a DICOMDIR.
  *
- * @param {object} data The buffer data of the DICOMDIR
+ * @param {object} data The buffer data of the DICOMDIR.
  * @returns {Array|undefined} The file list as an array ordered by
  *   STUDY > SERIES > IMAGES.
  */

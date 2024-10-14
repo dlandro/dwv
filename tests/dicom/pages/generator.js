@@ -74,7 +74,7 @@ function getPixelGeneratorName() {
 }
 
 /**
- * Generate DICOM data
+ * Generate DICOM data.
  */
 function onGenerate() {
   if (_generating) {
@@ -197,8 +197,7 @@ function onSaveTags() {
 function isValidTags() {
   try {
     JSON.parse(document.getElementById('tags').value);
-  } catch (error) {
-    /* eslint-disable-next-line no-alert */
+  } catch {
     alert('The JSON is not valid, please check it with JSONLint.');
     return false;
   }
@@ -232,7 +231,7 @@ function onInputTagsFile(event) {
 }
 
 /**
- * Handle input image file
+ * Handle input image file.
  *
  * @param {object} event The input field event.
  */
@@ -269,7 +268,6 @@ function onInputImageFiles(event) {
           // update tags if needed at first image load
           const tags = JSON.parse(document.getElementById('tags').value);
           if (checkTags(tags, this)) {
-            /* eslint-disable-next-line no-alert */
             alert('Updating tags to input image meta data.');
             document.getElementById('tags').value =
               JSON.stringify(tags, null, 2);

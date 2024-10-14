@@ -1,6 +1,11 @@
 import {logger} from '../utils/logger';
 import {Point2D} from '../math/point';
 
+// doc imports
+/* eslint-disable no-unused-vars */
+import {Annotation} from '../image/annotation';
+/* eslint-enable no-unused-vars */
+
 /**
  * List of interaction event names.
  */
@@ -23,14 +28,14 @@ export const customUI = {
   /**
    * Open a dialogue to edit roi data. Defaults to window.prompt.
    *
-   * @param {object} data The roi data.
+   * @param {Annotation} annotation The roi data.
    * @param {Function} callback The callback to launch on dialogue exit.
    */
-  openRoiDialog(data, callback) {
-    const textExpr = prompt('Label', data.textExpr);
+  openRoiDialog(annotation, callback) {
+    const textExpr = prompt('Label', annotation.textExpr);
     if (textExpr !== null) {
-      data.textExpr = textExpr;
-      callback(data);
+      annotation.textExpr = textExpr;
+      callback(annotation);
     }
   }
 };
@@ -111,8 +116,10 @@ export function getMousePoint(event) {
 /**
  * Test if a canvas with the input size can be created.
  *
- * @see https://github.com/ivmartel/dwv/issues/902
- * @see https://github.com/jhildenbiddle/canvas-size/blob/v1.2.4/src/canvas-test.js
+ * Ref:
+ * - {@link https://github.com/ivmartel/dwv/issues/902},
+ * - {@link https://github.com/jhildenbiddle/canvas-size/blob/v1.2.4/src/canvas-test.js}.
+ *
  * @param {number} width The canvas width.
  * @param {number} height The canvas height.
  * @returns {boolean} True is the canvas can be created.

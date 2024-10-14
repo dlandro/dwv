@@ -140,10 +140,10 @@ export class OpacityBinder {
       if (typeof event.dataid === 'undefined') {
         return;
       }
-      // propagate to first view layer
+      // propagate to first view layer if it is not base layer
       const viewLayers = layerGroup.getViewLayersByDataId(event.dataid);
-      if (viewLayers.length !== 0 &&
-        layerGroup.getNumberOfViewLayers() > 1) {
+      const baseLayer = layerGroup.getBaseViewLayer();
+      if (viewLayers.length !== 0 && baseLayer !== viewLayers[0]) {
         viewLayers[0].setOpacity(event.value);
         viewLayers[0].draw();
       }
@@ -179,9 +179,9 @@ export class Stage {
   /**
    * Active layer group index.
    *
-   * @type {number}
+   * @type {number|undefined}
    */
-  #activeLayerGroupIndex = null;
+  #activeLayerGroupIndex;
 
   /**
    * Image smoothing flag.
@@ -199,7 +199,7 @@ export class Stage {
    * Get the layer group at the given index.
    *
    * @param {number} index The index.
-   * @returns {LayerGroup} The layer group.
+   * @returns {LayerGroup|undefined} The layer group.
    */
   getLayerGroup(index) {
     return this.#layerGroups[index];
@@ -217,7 +217,7 @@ export class Stage {
   /**
    * Get the active layer group.
    *
-   * @returns {LayerGroup} The layer group.
+   * @returns {LayerGroup|undefined} The layer group.
    */
   getActiveLayerGroup() {
     return this.getLayerGroup(this.#activeLayerGroupIndex);
@@ -252,6 +252,23 @@ export class Stage {
   }
 
   /**
+   * Get a list of view layers according to an input callback function.
+   *
+   * @param {Function} [callbackFn] A function that takes
+   *   a ViewLayer as input and returns a boolean. If undefined,
+   *   returns all view layers.
+   * @returns {ViewLayer[]} The layers that
+   *   satisfy the callbackFn.
+   */
+  getViewLayers(callbackFn) {
+    let res = [];
+    for (let i = 0; i < this.#layerGroups.length; ++i) {
+      res = res.concat(this.#layerGroups[i].getViewLayers(callbackFn));
+    }
+    return res;
+  }
+
+  /**
    * Get the draw layers associated to a data id.
    *
    * @param {string} dataId The data id.
@@ -266,7 +283,26 @@ export class Stage {
   }
 
   /**
+   * Get a list of draw layers according to an input callback function.
+   *
+   * @param {Function} [callbackFn] A function that takes
+   *   a DrawLayer as input and returns a boolean. If undefined,
+   *   returns all draw layers.
+   * @returns {DrawLayer[]} The layers that
+   *   satisfy the callbackFn.
+   */
+  getDrawLayers(callbackFn) {
+    let res = [];
+    for (let i = 0; i < this.#layerGroups.length; ++i) {
+      res = res.concat(this.#layerGroups[i].getDrawLayers(callbackFn));
+    }
+    return res;
+  }
+
+  /**
    * Add a layer group to the list.
+   *
+   * The new layer group will be marked as the active layer group.
    *
    * @param {object} htmlElement The HTML element of the layer group.
    * @returns {LayerGroup} The newly created layer group.
@@ -325,7 +361,7 @@ export class Stage {
       this.#layerGroups[i].empty();
     }
     this.#layerGroups = [];
-    this.#activeLayerGroupIndex = null;
+    this.#activeLayerGroupIndex = undefined;
   }
 
   /**
@@ -383,28 +419,30 @@ export class Stage {
   }
 
   /**
-   * Synchronise the fit scale of the group layers.
+   * Fit to container: synchronise the div to world size ratio
+   *   of the group layers.
    */
-  syncLayerGroupScale() {
-    let minScale;
-    const hasScale = [];
+  fitToContainer() {
+    // find the minimum ratio
+    let minRatio;
+    const hasRatio = [];
     for (let i = 0; i < this.#layerGroups.length; ++i) {
-      const scale = this.#layerGroups[i].calculateFitScale();
-      if (typeof scale !== 'undefined') {
-        hasScale.push(i);
-        if (typeof minScale === 'undefined' || scale < minScale) {
-          minScale = scale;
+      const ratio = this.#layerGroups[i].getDivToWorldSizeRatio();
+      if (typeof ratio !== 'undefined') {
+        hasRatio.push(i);
+        if (typeof minRatio === 'undefined' || ratio < minRatio) {
+          minRatio = ratio;
         }
       }
     }
-    // exit if no scale
-    if (typeof minScale === 'undefined') {
+    // exit if no ratio
+    if (typeof minRatio === 'undefined') {
       return;
     }
-    // apply min scale to layers
+    // apply min ratio to layers
     for (let j = 0; j < this.#layerGroups.length; ++j) {
-      if (hasScale.includes(j)) {
-        this.#layerGroups[j].setFitScale(minScale);
+      if (hasRatio.includes(j)) {
+        this.#layerGroups[j].fitToContainer(minRatio);
       }
     }
   }
